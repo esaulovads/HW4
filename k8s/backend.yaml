@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: counter-backend-config
+data:
+  PORT: "9090"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: counter-backend
+  annotations:
+    kubernetes.io/change-cause: "backend 1.0.0"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: counter-backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: counter-backend
+    spec:
+      containers:
+        - name: backend
+          image: counter-backend:1.0.0
+          envFrom:
+            - configMapRef:
+                name: counter-backend-config
+          ports:
+            - name: http
+              containerPort: 9090
+          readinessProbe:
+            httpGet: { path: /api/counter, port: http }
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet: { path: /api/counter, port: http }
+            periodSeconds: 10
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: counter-backend
+spec:
+  selector:
+    app: counter-backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
