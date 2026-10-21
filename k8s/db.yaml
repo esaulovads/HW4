@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: counter-db-init
+data:
+  init.sql: |
+    CREATE TABLE counter (
+      id    integer PRIMARY KEY,
+      count integer NOT NULL
+    );
+    INSERT INTO counter VALUES (1, 0);
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: counter-db
+spec:
+  clusterIP: None
+  selector:
+    app: counter-db
+  ports:
+    - name: postgres
+      port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: counter-db
+spec:
+  serviceName: counter-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: counter-db
+  template:
+    metadata:
+      labels:
+        app: counter-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17
+          env:
+            - name: POSTGRES_USER
+              value: counter
+            - name: POSTGRES_DB
+              value: counter
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: counter-db
+                  key: password
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "counter", "-d", "counter"]
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 256Mi }
+      volumes:
+        - name: init
+          configMap:
+            name: counter-db-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
