@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frontend-scaler
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: frontend-scaler
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["counter-frontend"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    resourceNames: ["counter-frontend"]
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: frontend-scaler
+subjects:
+  - kind: ServiceAccount
+    name: frontend-scaler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: frontend-scaler
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: frontend-scale-up
+spec:
+  schedule: "0 9 * * *"
+  timeZone: "Europe/Moscow"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: frontend-scaler
+          restartPolicy: Never
+          containers:
+            - name: kubectl
+              image: registry.k8s.io/kubectl:v1.37.0
+              args: ["scale", "deployment/counter-frontend", "--replicas=3"]
+              resources:
+                requests: { cpu: 10m, memory: 32Mi }
+                limits: { memory: 64Mi }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: frontend-scale-down
+spec:
+  schedule: "0 18 * * *"
+  timeZone: "Europe/Moscow"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: frontend-scaler
+          restartPolicy: Never
+          containers:
+            - name: kubectl
+              image: registry.k8s.io/kubectl:v1.37.0
+              args: ["scale", "deployment/counter-frontend", "--replicas=1"]
+              resources:
+                requests: { cpu: 10m, memory: 32Mi }
+                limits: { memory: 64Mi }
