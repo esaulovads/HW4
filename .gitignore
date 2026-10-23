@@ -1,2 +1,3 @@
 certs/
-*.key.DS_Store
+*.key
+.DS_Store
