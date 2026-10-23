@@ -1,0 +1,42 @@
+ingress:
+  className: nginx
+  host: counter.localtest.me
+
+tls:
+  crt: ""
+  key: ""
+
+backend:
+  image: counter-backend
+  tag: "1.0.0"
+  replicas: 1
+  port: 9090
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+frontend:
+  image: counter-frontend
+  tag: "1.1.0"
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+db:
+  enabled: false
+  image: postgres:17
+  existingSecret: ""
+  storage: 1Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
